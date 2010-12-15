@@ -1,0 +1,82 @@
+<?php
+// $Id$ 
+
+/**
+ * @file 
+ */
+
+/*
+ * TODO: Add setup function to create directories for all users
+ * (perhaps only of a certain role)
+ *
+ */
+
+/**
+ * Implementation of hook_install() 
+ */
+function torrent_install() {
+   drupal_install_schema('torrent');
+}
+
+// implementation of hook schema
+
+function torrent_schema() {
+    $schema['torrent'] = array(
+        'description' => t('Holds data for an individual torrent'),
+        'fields' => array(
+            'tid' => array(
+                'description' => t('Transmission-daemon torrent id'),
+                'type' => 'int',
+                'unsigned' => TRUE,
+                'not null' => TRUE,
+            ),
+            'uid' => array(
+                'description' => t('user id of owner'),
+                'type' => 'int',
+                'unsigned' => TRUE,
+                'not null' => TRUE,
+            ),
+            'hash' => array(
+                'description' => t('hash code of torrent provided by transmission'),
+                'type' => 'varchar',
+                'length' => '255',
+                'not null' => TRUE,
+            ),
+            'size' => array(
+                'description' => t('Size of torrent'),
+                'type' => 'int',
+                'unsigned' => TRUE,
+                'not null' => FALSE,
+            ),
+            'datain' => array(
+                'description' => t('volume of data transferred in'),
+                'type' => 'int',
+                'unsigned' => TRUE,
+                'not null' => FALSE,
+            ),
+             'dataout' => array(
+                'description' => t('volume of data transferred out'),
+                'type' => 'int',
+                'unsigned' => TRUE,
+                'not null' => FALSE,
+            ),
+             'name' => array(
+                'description' => t('Title of torrent'),
+                'type' => 'varchar',
+                'length' => '255',
+                'not null' => FALSE,
+            ),
+        ),
+       'primary key' => array('tid'),
+    );
+
+    return $schema;
+}
+
+
+/**
+ * Implementation of hook_uninstall() 
+ */
+function torrent_uninstall() {
+
+}

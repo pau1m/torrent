@@ -1,0 +1,616 @@
+<?php
+// $Id$ 
+
+/*** couldn't locate correct enums in transmission.h ***/
+// TODO: Ask on tranmission IRC
+
+//define(TORRRENT_STATUS_CHECK_WAIT, ?); // Waiting in queue to check files
+//define(TORRENT_STATUS_CHECK, ?); // Checking files
+define(TORRENT_STATUS_DOWNLOADING, 4); 
+define(TORRENT_STATUS_SEEDING, 8); 
+define(TORRRENT_STATUS_PAUSED, 16);
+
+/**
+ * Implementation of hook_block() 
+ */
+function torrent_block($op='list', $delta=0, $edit=array()) {
+  switch ($op) {
+    case 'list':
+
+    case 'view':
+
+    case 'configure':
+
+    case 'save':
+
+  }
+}
+
+/**
+ * Implementation of hook_help() 
+ */
+function torrent_help($path, $arg) {
+       switch ($path){
+
+           case 'admin/help/#torrent':
+               return t('Write some help to go here');
+       }
+}
+
+
+function torrent_menu() {
+  $items = array();
+
+  $items['torrent/upload'] = array(
+    'title' => 'torrent',
+    'description' => 'Upload a torrent',
+    'page callback' => 'torrent_page',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+
+    $items['torrent/view'] = array(
+    'title' => 'torrent_view',
+    'description' => 'View added torrents',
+    'page callback' => 'torrent_view_page',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['admin/settings/torrent'] = array(
+      'title' => 'settings',
+      'description' => 'Transmission-daemon settings',
+      'page callback' => 'torrent_settings',
+      'access arguments' => array('access content'),
+      'type' => MENU_NORMAL_ITEM,
+  );
+
+  return $items;
+
+}
+function torrent_view_page(){
+    $output = t('View status and ... word to do download / control torrents');
+    $output .= drupal_get_form('torrent_viewform');
+    return $output;
+}
+
+function torrent_page(){
+    $output = t('Upload a torrent or paste URL');
+    $output .= drupal_get_form('torrent_uploadform');
+    return $output;
+}
+
+function torrent_settings(){
+    $output = 'TODO: Add more settings for per user control of torrents';
+    $output .= drupal_get_form('torrent_adminpage');
+    return $output;
+}
+
+
+function torrent_uploadform() {
+
+    $form['#attributes'] = array('enctype' => 'multipart/form-data');
+
+    $form['url'] = array(
+        '#title' => t('url'),
+        '#type' => 'fieldset',
+    );
+
+    $form['url']['link'] = array(
+        '#title' => t('Torrent url'),
+        '#type' => 'textarea',
+        '#description' => t('Paste the full URL of a torrent file'),
+    );
+
+    $form['file'] = array(
+        '#title' => t('file'),
+        '#type' => 'fieldset',
+    );
+    $form['file']['upload'] = array(
+        '#type' => 'file',
+        '#title' => t('Attach new file'),
+    );
+
+    $form['submit'] = array(
+        '#type' => 'submit',
+        '#value' => t('Submit'),
+    );
+
+    return $form;
+}
+
+function torrent_viewform() {
+    global $user;
+    $torrents = _query_torrents($user->uid);
+    $num_tors = count($torrents);
+    //dsm($torrents);
+
+    $form['torrent_actions'] = array(
+        '#type' => 'select',
+        '#title' => t('Actions'),
+        '#default_value' => 'start',
+        '#options' => array(
+            'start' => t('Start'),
+            'pause' => t('Pause'),
+            'delete' => t('Delete'),
+        ),
+    );
+
+     $form['submit_action'] = array(
+            '#type' => 'button',
+            '#value' => t('Update'),
+        );
+
+    for ($i = 0; $i < $num_tors; $i++) {
+
+        // current torrent object 
+        $tor = $torrents[$i];
+
+        // form attributes
+        $torrent_item = 'torrent' . $i;
+        $file_fieldset = 'fieldset' . $i;
+
+        // actions in here drop down of stuff to carry out on torrents
+
+        $form[$torrent_item] = array(
+            '#title' => $tor->name,
+            '#type' => 'checkbox',
+            '#description' =>   t('Status:').' '. _describe_status($tor->status).' '.
+                                t('Completed:').' '. _percent($tor->percentDone).'% '.
+                                t('Upload rate:').' '. _format_bytes($tor->rateUpload). ' '.
+                                t('Download rate:').' '. _format_bytes($tor->rateDownload). ' ',
+                                
+                                
+        );
+
+
+        $form[$file_fieldset] = array(
+            '#title' => 'files',
+            '#type' => 'fieldset',
+            '#collapsible' => true,
+            '#collapsed' => true,
+        );
+
+        $files = $tor->files;
+        $num_files = count($files);
+
+
+
+        for ($j = 0; $j < $num_files; $j++) {
+
+            $file_item = 'file' . $j;
+            $file_title = _strip_dir_from_filename($files[$j]->name);
+
+
+            $form[$file_fieldset][$file_item] = array(
+                '#title' => $file_title,
+                '#type' => 'checkbox',
+            //    '#collapsible' => true,
+            //    '#collapsed' => true,
+                '#description' => _percent($files[$j]->bytesCompleted, $files[$j]->length).' % '.t('complete'),
+            );
+        };
+    };
+    return $form;
+}
+
+function torrent_uploadform_submit($form_id, &$form_state) {
+    global $user;
+
+   dsm(_query_torrents($user->uid));
+
+    $result = "";
+
+    dsm($form_state['values']['upload']);
+    dsm($form_state);
+
+    // need to do proper validation
+
+    dsm('upload');
+    if ($file = file_save_upload('upload', $validators, file_directory_path())) {
+        dsm($file);
+        dsm(file_directory_path());
+        dsm($file->filename);
+        // ugly. fix.
+
+        // create url with fileapi
+     //   $torrenr_file = file_create_filename($basename, $directory)
+        $tor = file_get_contents(file_directory_path() . "/" . $file->filename);
+
+
+        $result = _add_b64_torrent(base64_encode($tor));
+        $result_obj = json_decode($result);
+        dsm($result_obj);
+
+        if ($result_obj->result == "success") {
+            dsm('torrent succesfully added');
+           // $arguments = $result_obj->arguments;
+           // dsm($arguments);
+            $torrent_added = $result_obj->arguments->{'torrent-added'}; // account for dash
+            dsm($torrent_added);
+            dsm($torrent_added->hashString);
+            dsm($torrent_added->name);
+            dsm($torrent_added->id);
+
+
+            /*************** add torrent to database *************/
+            $table = 'torrent';
+            $record = new stdClass();
+            $record->name = $torrent_added->name;
+            $record->tid = $torrent_added->id;
+            $record->hash = $torrent_added->hashString;
+            $record->uid = $user->uid;
+            drupal_write_record($table, $record);
+
+            // add torrent details to database
+            // add hash, name and id to db
+        } else {
+            dsm('explain what the problem was');
+            if ($result_obj->result == "duplicate torrent"){
+                drupal_set_message("Torrent already exists");
+                // add user to torrent???
+                // torrent owner
+            }
+            // find existing torrent and add to user....
+            // check for other results
+        }
+
+    }
+}
+
+function torrent_adminpage(){
+    $form['transmission'] = array(
+        '#title' => t('Transmission-daemon'),
+        '#description' => t('Server settings'),
+        '#type' => 'fieldset',
+    );
+    $form['transmission']['rpc_url'] = array(
+        '#title' => t('Transmission Daemon RPC URL'),
+        '#description' => t('The RPC address of your transmission server e.g. example.com/transmission/rpc'),
+        '#type' => 'textfield',
+        '#default_value' => '192.168.0.9/transmission/rpc',
+        '#size' => 60,
+        '#maxlength' => 128,
+    );
+
+        $form['transmission']['rpc_port'] = array(
+        '#title' => t('Port number'),
+        '#description' => t('The listening port  of your transmission server'),
+        '#type' => 'textfield',
+        '#default_value' => '9091',
+        '#size' => 10,
+        '#maxlength' => 5,
+    );
+
+    $form['transmission']['user_name'] = array(
+        '#title' => t('User name'),
+        '#description' => t('description here'),
+        '#type' => 'textfield',
+        '#default_value' => '',
+        '#size' => 20,
+        '#maxlength' => 20,
+    );
+
+    $form['transmission']['password'] = array(
+        '#title' => t('Password'),
+        '#description' => t('description here'),
+        '#type' => 'password',
+        '#default_value' => '',
+        '#size' => 20,
+        '#maxlength' => 20,
+    );
+
+   $form['transmission']['submit'] = array(
+       '#title' => t('Submit'),
+       '#type' => 'submit',
+       '#value' => t('Submit'),
+   );
+
+     return $form;
+}
+
+/*
+ * Implemenation of hook_user()
+ *
+ * New User - create directories
+ */
+function torrent_user($op, &$edit, &$account, $category = NULL){
+    global $user;
+
+    switch ($op){
+        case 'insert':
+           watchdog('torrent', 'new user %usr has been created', array('%usr' => $account->uid));
+            dsm($account);
+            _create_user_directories($account->uid);
+    }
+
+}
+
+function torrent_adminpage_submit($form_id, $form_state){
+    $ch = curl_init();
+    $rpc_url = $form_state['values']['rpc_url'];
+    $rpc_port = $form_state['values']['rpc_port'];
+
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, 1);
+    curl_setopt($ch, CURLOPT_URL, $rpc_url);
+    curl_setopt($ch, CURLOPT_PORT, $rpc_port);
+
+    $result = curl_exec($ch);
+
+      $result_info = curl_getinfo($ch);
+
+
+    if ($result_info[http_code] == 409) { //or 200
+        dsm('successfully contacted transmission server');
+        dsm('attempting to get session id');
+        $session_id = _get_rpc_session_id($result, $result_info);
+        dsm("Session ID is: ".$session_id);
+
+        variable_set('transmission_rpc_url', $rpc_url);
+        variable_set('transmission_rpc_port', $rpc_port);
+        variable_set('transmission_rpc_session_id', $session_id);
+
+    } else {
+        // session id stuff in here // return a working handler or explain problems
+        // print this out
+        //
+        dsm('could not contact server: check settings');
+    }
+}
+
+/*
+ *
+ * result = curl_exec
+ * header = curl_getinfo
+ *
+ * should probably pass in ch
+ *
+ *
+ */
+function _get_rpc_session_id($result, $header){
+
+    $pattern = '@[a-zA-Z0-9]{48}@i';
+
+    if ($header['http_code'] == 409){
+        if (preg_match($pattern, $result, &$matches)){
+            return $matches[0];
+        }
+    }
+    //die???
+    return null;    // no matches
+}
+
+/*
+ * Add a torrent to transmission-daeomon based from URL
+ *
+ * @param $torrent_url
+ * The URI of a torrent
+ *
+ * @return
+ * Curl handle
+ *
+ */
+function _add_torrent($torrent_url) {
+
+    $torrent_request = array(
+        'method' => 'torrent-add',
+        'arguments' => array(
+            'filename' => $torrent_url,
+            'paused' => true,
+        ),
+    );
+
+    $ch = _create_curl_handle(json_encode($torrent_request));
+
+    return curl_exec($ch);
+}
+
+/*
+ * Uploads a torrent
+ * 
+ */
+
+function _add_b64_torrent($base) {
+    $torrent_request = array(
+        'method' => 'torrent-add',
+        'arguments' => array(
+            'metainfo' => $base,
+            'paused' => true,
+        )
+    );
+
+    $ch = _create_curl_handle(json_encode($torrent_request));
+
+    return curl_exec($ch);
+}
+
+/*
+ *@param $request
+ * JSON endcoded request for transmission-daemon RPC
+ *
+ * @param return
+ * 
+ *
+ */
+
+function _create_curl_handle($request = null) {
+    $ch = curl_init();
+
+    if (isset($request)) {
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $request);
+    }
+
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, 1);
+    curl_setopt($ch, CURLOPT_URL, variable_get('transmission_rpc_url', ""));
+    curl_setopt($ch, CURLOPT_PORT, variable_get('transmission_rpc_port', ""));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+        "X-Transmission-Session-Id: " . variable_get('transmission_rpc_session_id', "")));
+
+    // change this to make curl request
+
+    // make request
+    // check valud
+    // if invalid
+    // if success
+    // don't know what other codes could be returned.
+    // just carry out the whole thing
+
+
+
+    return $ch;
+}
+
+function _get_transmission_rpc_session_id($ch){
+
+
+}
+
+
+
+// should this info be stored in the database or session variables
+// I'm thinking session for the moment
+
+/*
+ * Retrieve session id from rpc server
+ */
+
+
+
+function _check_valid_session(){
+    
+    
+}
+
+
+
+/****************** File Handling *****************/
+
+/*
+ * Create file paths for user
+ * TODO: should hook in to new user creation)
+ * Use on first run (add to install)
+ * And when a user is added.
+ * Poss also check users and directories on cron run on cron run
+ *
+ */
+function _create_user_directories($userid){
+
+   $user_torrents_dir = file_create_path() . "/torrent/" . $userid ;
+   $uploaded_torrents = $user_torrents_dir . "/" . "torrents";
+   $completed_files = $user_torrents_dir . "/" . "completed";
+
+   // watch dog here
+   // need to update .install to create directory on boots
+   _directory_exists($user_torrents_dir);
+   _directory_exists($uploaded_torrents);
+   _directory_exists($completed_files);
+}
+
+/*
+ * Checks if directory exists and is writable,  if not attempts to creates one
+ *
+ * @param $dir
+ * Directory to be creates
+ *
+ * @return
+ * Boolean
+ *          -TRUE Directory exists and is writable
+ *          -FALSE Unable to create or write to directory
+ */
+function _directory_exists($dir) {
+
+  if (!file_check_directory($dir, FILE_CREATE_DIRECTORY) && !mkdir($dir, 0775, TRUE)) {
+    watchdog('torrent', 'Failed to create user directory: %dir', array('%dir' => $dir), WATCHDOG_ERROR);
+    return FALSE;
+  }
+}
+
+
+
+function _query_torrents($userid){
+
+    $torrent_info = array();
+    $hashes = array();
+
+    $result = db_query('SELECT hash FROM {torrent} t WHERE uid = %d ORDER BY t.tid ASC', $userid);
+    while ($hashes[] = db_fetch_object($result)->hash){
+
+    }
+    array_pop($hashes); // last item was null, perhaps a for loop wld be better
+
+      $torrent_request = array(
+        'method' => 'torrent-get',
+        'arguments' => array(
+            'ids' => $hashes,
+            'fields' => array('files', 'downloadDir', 'startDate', 'name',
+                               'rateUpload', 'rateDownload', 'status',
+                               'percentDone', 'totalSize'),
+        ),
+    );
+
+     $ch = _create_curl_handle(json_encode($torrent_request));
+     
+     $response = json_decode(curl_exec($ch));
+
+
+    if ($response->result == 'success') {
+        $torrent_info = $response->arguments->torrents;
+
+        return $torrent_info;
+    } else {
+        return null;
+    }
+}
+
+
+/*
+ *
+ * If only $amount is passed, assume number is in 0.x format i.e. 0.5 = 50%
+ * Otherwise calculate normal percentage
+ *
+ */
+function _percent($amount, $total = 1){
+
+
+    return number_format((($amount/$total)*100),0);
+}
+
+function _strip_dir_from_filename($string){
+    // remove everything before last '/' and then strip that '/'
+   return  substr(strrchr($string, '/'), 1);
+}
+
+/*
+ * copied from php.net
+ */
+
+function _format_bytes($bytes, $precision = 2) {
+    $units = array('B', 'KB', 'MB', 'GB', 'TB');
+
+    $bytes = max($bytes, 0);
+    $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
+    $pow = min($pow, count($units) - 1);
+
+    // Uncomment one of the following alternatives
+    $bytes /= pow(1024, $pow);
+    // $bytes /= (1 << (10 * $pow));
+
+    return round($bytes, $precision) . ' ' . $units[$pow];
+}
+
+
+function _describe_status($current_status) {
+    switch ($current_status) {
+        case TORRENT_STATUS_DOWNLOADING:
+            return t('Downloading');
+        case TORRENT_STATUS_SEEDING:
+            return t('Seeding');
+        case TORRENT_STATUS_PAUSED:
+            return t('Paused');
+        case 16:
+            return t('Paused');  // for some reason beyond understanding constant for paused won't work!?
+    }
+    return ($current_status);
+}

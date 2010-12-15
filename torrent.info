@@ -1,0 +1,7 @@
+; $Id$ 
+name = Torrent
+description = Torrent client for transmission-daemon
+package = Torrent
+version = 6.x-0.1
+core = 6.x
+php =
